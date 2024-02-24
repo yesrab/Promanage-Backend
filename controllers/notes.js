@@ -149,7 +149,7 @@ const analytics = async (req, res) => {
   const { noteId } = req.body;
   console.log(noteId);
   const created = new mongoose.Types.ObjectId(noteId);
-  const pipeline = [
+  const priorityPipeline = [
     {
       $match: { createdBy: created }, // Filter by createdBy id
     },
@@ -159,51 +159,6 @@ const analytics = async (req, res) => {
     {
       $group: {
         _id: null, // Group all documents
-        backLogTasks: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$todos.section", "backlog"] },
-                  { $eq: ["$todos.check", false] },
-                ],
-              },
-              1,
-              0,
-            ],
-          },
-        },
-        todoTasks: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$todos.section", "todo"] },
-                  { $eq: ["$todos.check", false] },
-                ],
-              },
-              1,
-              0,
-            ],
-          },
-        },
-        inProgressTasks: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $eq: ["$todos.section", "inProgress"] },
-                  { $eq: ["$todos.check", false] },
-                ],
-              },
-              1,
-              0,
-            ],
-          },
-        },
-        completedTasks: {
-          $sum: { $eq: ["$todos.check", true] },
-        },
         lowPriority: {
           $sum: {
             $cond: [
@@ -246,15 +201,48 @@ const analytics = async (req, res) => {
             ],
           },
         },
-        dueDateTasks: {
-          $sum: { $not: [{ $eq: ["$todos.dueDate", null] }] },
-        },
       },
     },
   ];
-  const data = await Note.aggregate(pipeline);
 
-  res.status(200).json({ user: noteId, created, data });
+  const taskPipeline = [
+    {
+      $match: { createdBy: created }, // Filter by createdBy id
+    },
+    {
+      $project: {
+        todos: 1,
+        section: 1,
+      },
+    },
+    {
+      $unwind: "$todos", // Unwind the todos array
+    },
+    {
+      $match: {
+        "todos.check": false, // Filter out only the unchecked todos
+      },
+    },
+    {
+      $group: {
+        _id: "$section",
+        count: { $sum: 1 }, // Count the number of todos in each section
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        section: "$_id",
+        count: 1,
+      },
+    },
+  ];
+
+  const taskData = await Note.aggregate(taskPipeline);
+
+  const priorityData = await Note.aggregate(priorityPipeline);
+
+  res.status(200).json({ user: created, priorityData, taskData });
 };
 
 module.exports = {
