@@ -149,55 +149,23 @@ const analytics = async (req, res) => {
   const { noteId } = req.body;
   console.log(noteId);
   const created = new mongoose.Types.ObjectId(noteId);
-
-  const data = await Note.aggregate([
+  const pipeline = [
     { $match: { createdBy: created } },
     {
       $project: {
-        backLogTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$section", "backlog"] },
-                  { $eq: ["$todos.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        todoTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$section", "todo"] },
-                  { $eq: ["$todos.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        inProgressTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$section", "inProgress"] },
-                  { $eq: ["$todos.check", false] },
-                ],
-              },
-            },
-          },
-        },
+        todos: 1,
+        Priority: 1,
+        section: 1,
+        dueDate: 1,
+      },
+    },
+    {
+      $project: {
         completedTasks: {
           $size: {
             $filter: {
               input: "$todos",
-              cond: { $eq: ["$todos.check", true] },
+              cond: { $eq: ["$$this.check", true] },
             },
           },
         },
@@ -207,8 +175,8 @@ const analytics = async (req, res) => {
               input: "$todos",
               cond: {
                 $and: [
-                  { $eq: ["$Priority", "LOW"] },
-                  { $eq: ["$todos.check", false] },
+                  { $eq: ["$$this.Priority", "LOW"] },
+                  { $eq: ["$$this.check", false] },
                 ],
               },
             },
@@ -220,8 +188,8 @@ const analytics = async (req, res) => {
               input: "$todos",
               cond: {
                 $and: [
-                  { $eq: ["$Priority", "MODERATE"] },
-                  { $eq: ["$todos.check", false] },
+                  { $eq: ["$$this.Priority", "MODERATE"] },
+                  { $eq: ["$$this.check", false] },
                 ],
               },
             },
@@ -233,8 +201,8 @@ const analytics = async (req, res) => {
               input: "$todos",
               cond: {
                 $and: [
-                  { $eq: ["$Priority", "HIGH"] },
-                  { $eq: ["$todos.check", false] },
+                  { $eq: ["$$this.Priority", "HIGH"] },
+                  { $eq: ["$$this.check", false] },
                 ],
               },
             },
@@ -244,13 +212,71 @@ const analytics = async (req, res) => {
           $size: {
             $filter: {
               input: "$todos",
-              cond: { $ne: ["$dueDate", null] },
+              cond: {
+                $and: [
+                  { $ne: ["$dueDate", null] },
+                  { $eq: ["$$this.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        backLogTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$$this.section", "backlog"] },
+                  { $eq: ["$$this.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        todoTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$$this.section", "todo"] },
+                  { $eq: ["$$this.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        inProgressTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$$this.section", "inProgress"] },
+                  { $eq: ["$$this.check", false] },
+                ],
+              },
             },
           },
         },
       },
     },
-  ]);
+    {
+      $group: {
+        _id: null,
+        completedTasks: { $sum: "$completedTasks" },
+        lowPriority: { $sum: "$lowPriority" },
+        moderatePriority: { $sum: "$moderatePriority" },
+        highPriority: { $sum: "$highPriority" },
+        dueDateTasks: { $sum: "$dueDateTasks" },
+        backLogTasks: { $sum: "$backLogTasks" },
+        todoTasks: { $sum: "$todoTasks" },
+        inProgressTasks: { $sum: "$inProgressTasks" },
+      },
+    },
+  ];
+  const data = await Note.aggregate(pipeline);
 
   res.status(200).json({ user: noteId, created, data });
 };
