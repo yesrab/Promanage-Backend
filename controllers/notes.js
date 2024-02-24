@@ -150,129 +150,105 @@ const analytics = async (req, res) => {
   console.log(noteId);
   const created = new mongoose.Types.ObjectId(noteId);
   const pipeline = [
-    { $match: { createdBy: created } },
     {
-      $project: {
-        todos: 1,
-        Priority: 1,
-        section: 1,
-        dueDate: 1,
-      },
+      $match: { createdBy: created }, // Filter by createdBy id
     },
     {
-      $project: {
-        completedTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: { $eq: ["$$this.check", true] },
-            },
-          },
-        },
-        lowPriority: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$$this.Priority", "LOW"] },
-                  { $eq: ["$$this.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        moderatePriority: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$$this.Priority", "MODERATE"] },
-                  { $eq: ["$$this.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        highPriority: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$$this.Priority", "HIGH"] },
-                  { $eq: ["$$this.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        dueDateTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $ne: ["$dueDate", null] },
-                  { $eq: ["$$this.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        backLogTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$$this.section", "backlog"] },
-                  { $eq: ["$$this.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        todoTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$$this.section", "todo"] },
-                  { $eq: ["$$this.check", false] },
-                ],
-              },
-            },
-          },
-        },
-        inProgressTasks: {
-          $size: {
-            $filter: {
-              input: "$todos",
-              cond: {
-                $and: [
-                  { $eq: ["$$this.section", "inProgress"] },
-                  { $eq: ["$$this.check", false] },
-                ],
-              },
-            },
-          },
-        },
-      },
+      $unwind: "$todos", // Deconstruct the todos array
     },
     {
       $group: {
-        _id: null,
-        completedTasks: { $sum: "$completedTasks" },
-        lowPriority: { $sum: "$lowPriority" },
-        moderatePriority: { $sum: "$moderatePriority" },
-        highPriority: { $sum: "$highPriority" },
-        dueDateTasks: { $sum: "$dueDateTasks" },
-        backLogTasks: { $sum: "$backLogTasks" },
-        todoTasks: { $sum: "$todoTasks" },
-        inProgressTasks: { $sum: "$inProgressTasks" },
+        _id: null, // Group all documents
+        backLogTasks: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$todos.section", "backlog"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        todoTasks: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$todos.section", "todo"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        inProgressTasks: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$todos.section", "inProgress"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        completedTasks: {
+          $sum: { $eq: ["$todos.check", true] },
+        },
+        lowPriority: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$Priority", "LOW"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        moderatePriority: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$Priority", "MODERATE"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        highPriority: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$Priority", "HIGH"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        dueDateTasks: {
+          $sum: { $not: [{ $eq: ["$todos.dueDate", null] }] },
+        },
       },
     },
   ];
