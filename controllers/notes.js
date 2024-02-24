@@ -1,5 +1,5 @@
 const Note = require("../model/notes");
-
+const mongoose = require("mongoose");
 const getAllNotes = async (req, res) => {
   const { tokenData, clientTime, timefilter } = res.locals;
   // console.log("time recived:", timefilter);
@@ -144,4 +144,122 @@ const updateNote = async (req, res) => {
   res.json({ updatedDoc });
 };
 
-module.exports = { getAllNotes, addNote, alterNote, updateNote, deleteNote };
+const analytics = async (req, res) => {
+  const { tokenData, clientTime, timefilter } = res.locals;
+  const { noteId } = req.body;
+  console.log(noteId);
+  const created = new mongoose.Types.ObjectId(noteId);
+
+  const data = await Note.aggregate([
+    { $match: { createdBy: created } },
+    {
+      $project: {
+        backLogTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$section", "backlog"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        todoTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$section", "todo"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        inProgressTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$section", "inProgress"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        completedTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: { $eq: ["$todos.check", true] },
+            },
+          },
+        },
+        lowPriority: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$Priority", "LOW"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        moderatePriority: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$Priority", "MODERATE"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        highPriority: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: {
+                $and: [
+                  { $eq: ["$Priority", "HIGH"] },
+                  { $eq: ["$todos.check", false] },
+                ],
+              },
+            },
+          },
+        },
+        dueDateTasks: {
+          $size: {
+            $filter: {
+              input: "$todos",
+              cond: { $ne: ["$dueDate", null] },
+            },
+          },
+        },
+      },
+    },
+  ]);
+
+  res.status(200).json({ user: noteId, created, data });
+};
+
+module.exports = {
+  getAllNotes,
+  addNote,
+  alterNote,
+  updateNote,
+  deleteNote,
+  analytics,
+};
