@@ -6,6 +6,7 @@ const {
   alterNote,
   updateNote,
   deleteNote,
+  analytics,
 } = require("../controllers/notes");
 const { requireAuth } = require("../middleware/authMiddleware");
 router
@@ -15,5 +16,7 @@ router
   .patch(requireAuth, alterNote)
   .put(requireAuth, updateNote)
   .delete(requireAuth, deleteNote);
+
+router.route("/analytics").get(requireAuth, analytics);
 
 module.exports = router;

@@ -33,6 +33,9 @@ app.use("/api/v1/users/", accountRoutes);
 const notesRoutes = require("./routes/notes");
 app.use("/api/v1/notes/", notesRoutes);
 
+const sharedNotes = require("./routes/shared");
+app.use("/api/v1/share/", sharedNotes);
+
 //use error handler
 app.use(errorHandler);
 

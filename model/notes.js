@@ -57,6 +57,12 @@ const NotesSchema = new mongoose.Schema(
         },
       ],
       required: true,
+      validate: {
+        validator: function (todos) {
+          return todos.length > 0;
+        },
+        message: "Todos array must not be empty",
+      },
     },
   },
   { timestamps: true }
