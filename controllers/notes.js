@@ -4,9 +4,7 @@ const getAllNotes = async (req, res) => {
   const { tokenData, clientTime, timefilter } = res.locals;
   // console.log("time recived:", timefilter);
   if (!tokenData || !clientTime || !timefilter) {
-    return res
-      .status(400)
-      .json({ msg: "request data missing", status: "Error" });
+    return res.status(400).json({ msg: "request data missing", status: "Error" });
   }
   let startDate;
   switch (timefilter) {
@@ -26,9 +24,7 @@ const getAllNotes = async (req, res) => {
       // console.log(startDate);
       break;
     default:
-      return res
-        .status(400)
-        .json({ msg: "Invalid time filter", status: "Error" });
+      return res.status(400).json({ msg: "Invalid time filter", status: "Error" });
   }
 
   const note = await Note.find({
@@ -36,9 +32,7 @@ const getAllNotes = async (req, res) => {
     createdAt: { $gte: startDate, $lte: new Date(clientTime) },
   });
 
-  res
-    .status(200)
-    .json({ createdBy: tokenData.id, data: note, status: "success" });
+  res.status(200).json({ createdBy: tokenData.id, data: note, status: "success" });
 };
 
 const addNote = async (req, res, next) => {
@@ -78,14 +72,10 @@ const alterNote = async (req, res) => {
     });
 
     if (!note) {
-      return res
-        .status(404)
-        .json({ message: "Note not found", status: "Error" });
+      return res.status(404).json({ message: "Note not found", status: "Error" });
     }
     // console.log(note.todos[1]._id.toString());
-    const indexOfTodo = note.todos.findIndex(
-      (noteObj) => noteObj._id.toString() === todoId
-    );
+    const indexOfTodo = note.todos.findIndex((noteObj) => noteObj._id.toString() === todoId);
     // console.log("this is the index:", indexOfTodo);
 
     if (indexOfTodo !== -1) {
@@ -93,9 +83,7 @@ const alterNote = async (req, res) => {
       const updatedNote = await note.save();
       return res.status(202).json({ updatedNote, status: "success" });
     } else {
-      return res
-        .status(404)
-        .json({ message: "Note not found", status: "Error" });
+      return res.status(404).json({ message: "Note not found", status: "Error" });
     }
   }
   const note = await Note.findOne({ _id: noteId, createdBy: tokenData.id });
@@ -165,10 +153,7 @@ const analytics = async (req, res) => {
           $sum: {
             $cond: [
               {
-                $and: [
-                  { $eq: ["$Priority", "LOW"] },
-                  { $eq: ["$todos.check", false] },
-                ],
+                $and: [{ $eq: ["$Priority", "LOW"] }, { $eq: ["$todos.check", false] }],
               },
               1,
               0,
@@ -179,10 +164,7 @@ const analytics = async (req, res) => {
           $sum: {
             $cond: [
               {
-                $and: [
-                  { $eq: ["$Priority", "MODERATE"] },
-                  { $eq: ["$todos.check", false] },
-                ],
+                $and: [{ $eq: ["$Priority", "MODERATE"] }, { $eq: ["$todos.check", false] }],
               },
               1,
               0,
@@ -193,10 +175,7 @@ const analytics = async (req, res) => {
           $sum: {
             $cond: [
               {
-                $and: [
-                  { $eq: ["$Priority", "HIGH"] },
-                  { $eq: ["$todos.check", false] },
-                ],
+                $and: [{ $eq: ["$Priority", "HIGH"] }, { $eq: ["$todos.check", false] }],
               },
               1,
               0,
