@@ -6,32 +6,42 @@ const getAllNotes = async (req, res) => {
   if (!tokenData || !clientTime || !timefilter) {
     return res.status(400).json({ msg: "request data missing", status: "Error" });
   }
+  console.log("time filter", timefilter);
   let startDate;
+  let endDate;
   switch (timefilter) {
     case "This Month":
       startDate = new Date(clientTime);
-      startDate.setMonth(startDate.getMonth() - 1);
+      startDate.setDate(startDate.getDate() - 30);
       startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(clientTime);
+      endDate.setHours(23, 59, 59, 999);
       break;
     case "This Week":
       startDate = new Date(clientTime);
-      startDate.setDate(startDate.getDate() - 7);
+      const dayOfWeek = startDate.getDay();
+      const diff = startDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      startDate.setDate(diff);
       startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(clientTime);
+      endDate.setHours(23, 59, 59, 999);
       break;
     case "Today":
       startDate = new Date(clientTime);
       startDate.setHours(0, 0, 0, 0);
-      // console.log(startDate);
+      endDate = new Date(clientTime);
+      endDate.setHours(23, 59, 59, 999);
       break;
     default:
       return res.status(400).json({ msg: "Invalid time filter", status: "Error" });
   }
-
   const note = await Note.find({
     createdBy: tokenData.id,
-    createdAt: { $gte: startDate, $lte: new Date(clientTime) },
+    createdAt: { $gte: startDate, $lte: endDate },
   });
 
+  // console.log("start date", startDate);
+  // console.log("end date", endDate);
   res.status(200).json({ createdBy: tokenData.id, data: note, status: "success" });
 };
 
@@ -53,6 +63,7 @@ const addNote = async (req, res, next) => {
     todos,
     createdBy: tokenData.id,
   });
+  console.log("added new data", submittedNote);
   return res.status(201).json({ submittedNote, status: "success" });
 
   // console.log(submittedNote);
