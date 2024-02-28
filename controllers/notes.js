@@ -2,11 +2,10 @@ const Note = require("../model/notes");
 const mongoose = require("mongoose");
 const getAllNotes = async (req, res) => {
   const { tokenData, clientTime, timefilter } = res.locals;
-  // console.log("time recived:", timefilter);
   if (!tokenData || !clientTime || !timefilter) {
     return res.status(400).json({ msg: "request data missing", status: "Error" });
   }
-  console.log("time filter", timefilter);
+  // console.log("time filter", timefilter);
   let startDate;
   let endDate;
   switch (timefilter) {
@@ -40,9 +39,30 @@ const getAllNotes = async (req, res) => {
     createdAt: { $gte: startDate, $lte: endDate },
   });
 
-  // console.log("start date", startDate);
-  // console.log("end date", endDate);
-  res.status(200).json({ createdBy: tokenData.id, data: note, status: "success" });
+  const sortedNotes = note.toSorted((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+  const backlogNotes = sortedNotes.filter((item) => item.section === "backlog");
+  const todoNotes = sortedNotes.filter((item) => item.section === "todo");
+  const progressNotes = sortedNotes.filter((item) => item.section === "inProgress");
+  const doneNotes = sortedNotes.filter((item) => item.section === "done");
+
+  res.status(200).json({
+    createdBy: tokenData.id,
+    // data: sortedNotes,
+    backlogNotes,
+    todoNotes,
+    progressNotes,
+    doneNotes,
+    status: "success",
+  });
+  //  res.status(200).json({
+  //    createdBy: tokenData.id,
+  //    data: sortedNotes,
+  //    backlogNotes,
+  //    todoNotes,
+  //    progressNotes,
+  //    doneNotes,
+  //    status: "success",
+  //  });
 };
 
 const addNote = async (req, res, next) => {
@@ -289,6 +309,11 @@ const analytics = async (req, res) => {
       $unwind: "$todos", // Unwind the todos array
     },
     {
+      $match: {
+        "todos.check": false, // Filter out only the unchecked todos
+      },
+    },
+    {
       $group: {
         _id: null,
         totalTodosWithDueDate: { $sum: 1 }, // Count the number of todos associated with notes that have a dueDate
@@ -335,21 +360,158 @@ const analytics = async (req, res) => {
       },
     },
   ];
+
+  const numberoFCardsCountPipeline = [
+    {
+      $match: {
+        createdBy: created, // Match notes created by the specified user
+      },
+    },
+    {
+      $facet: {
+        backlog: [{ $match: { section: "backlog" } }, { $count: "count" }],
+        todo: [{ $match: { section: "todo" } }, { $count: "count" }],
+        done: [{ $match: { section: "done" } }, { $count: "count" }],
+        inProgress: [{ $match: { section: "inProgress" } }, { $count: "count" }],
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        backlog: { $ifNull: [{ $arrayElemAt: ["$backlog.count", 0] }, 0] },
+        todo: { $ifNull: [{ $arrayElemAt: ["$todo.count", 0] }, 0] },
+        done: { $ifNull: [{ $arrayElemAt: ["$done.count", 0] }, 0] },
+        inProgress: { $ifNull: [{ $arrayElemAt: ["$inProgress.count", 0] }, 0] },
+      },
+    },
+  ];
+
+  const cardsByPriority = [
+    {
+      $match: {
+        createdBy: created, // Match notes created by the specified user
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        HIGH: {
+          $sum: {
+            $cond: [
+              {
+                $eq: ["$Priority", "HIGH"],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        LOW: {
+          $sum: {
+            $cond: [
+              {
+                $eq: ["$Priority", "LOW"],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        MODERATE: {
+          $sum: {
+            $cond: [
+              {
+                $eq: ["$Priority", "MODERATE"],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+      },
+    },
+    {
+      $project: {
+        HIGH: {
+          $ifNull: ["$HIGH", 0],
+        },
+        LOW: {
+          $ifNull: ["$LOW", 0],
+        },
+        MODERATE: {
+          $ifNull: ["$MODERATE", 0],
+        },
+      },
+    },
+    {
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: [
+            {
+              HIGH: "$HIGH",
+            },
+            {
+              LOW: "$LOW",
+            },
+            {
+              MODERATE: "$MODERATE",
+            },
+          ],
+        },
+      },
+    },
+  ];
+  const endDate = new Date(clientTime);
+  endDate.setHours(0, 0, 0, 0);
+
+  console.log(endDate);
+  const dueDateCardPipeline = [
+    {
+      $match: {
+        createdBy: created,
+        dueDate: {
+          $gte: endDate,
+        },
+        section: {
+          $ne: "done",
+        },
+      },
+    },
+    {
+      $count: "dueDateCards",
+    },
+  ];
+
   const compleatedData = await Note.aggregate(compleatedPipeline);
   const dueDateData = await Note.aggregate(dueDatePipeline);
   const taskData = await Note.aggregate(taskPipeline);
   const priorityData = await Note.aggregate(priorityPipeline);
-
-  const anyliticsData = {
+  const cardCountData = await Note.aggregate(numberoFCardsCountPipeline);
+  const cardCountByPriority = await Note.aggregate(cardsByPriority);
+  const cardsPerDueDate = await Note.aggregate(dueDateCardPipeline);
+  const anyliticsDataPerTask = {
     ...compleatedData[0],
     ...dueDateData[0],
     ...taskData[0],
     ...priorityData[0],
   };
+  const dueDateCardCount = cardsPerDueDate[0]?.dueDateCards || 0;
+  const anyliticsDataPerCard = {
+    ...cardCountByPriority[0],
+    ...cardCountData[0],
+    dueDateCardCount,
+  };
 
   res.status(200).json({
     user: created,
-    anyliticsData,
+    anyliticsDataPerTask,
+    anyliticsDataPerCard,
+
     status: "success",
   });
 };
