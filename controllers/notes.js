@@ -389,7 +389,8 @@ const analytics = async (req, res) => {
   const cardsByPriority = [
     {
       $match: {
-        createdBy: created, // Match notes created by the specified user
+        createdBy: created,
+        section: { $ne: "done" },
       },
     },
     {
@@ -469,7 +470,7 @@ const analytics = async (req, res) => {
   const endDate = new Date(clientTime);
   endDate.setHours(0, 0, 0, 0);
 
-  console.log(endDate);
+  // console.log(endDate);
   const dueDateCardPipeline = [
     {
       $match: {
@@ -494,6 +495,7 @@ const analytics = async (req, res) => {
   const cardCountData = await Note.aggregate(numberoFCardsCountPipeline);
   const cardCountByPriority = await Note.aggregate(cardsByPriority);
   const cardsPerDueDate = await Note.aggregate(dueDateCardPipeline);
+  // console.log(cardCountByPriority);
   const anyliticsDataPerTask = {
     ...compleatedData[0],
     ...dueDateData[0],
