@@ -83,7 +83,7 @@ const addNote = async (req, res, next) => {
     todos,
     createdBy: tokenData.id,
   });
-  console.log("added new data", submittedNote);
+  // console.log("added new data", submittedNote);
   return res.status(201).json({ submittedNote, status: "success" });
 
   // console.log(submittedNote);
