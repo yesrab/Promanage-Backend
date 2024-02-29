@@ -34,6 +34,7 @@ Environment setup:
 Environment variables
 DB="your mongodb connection URI"
 JWT_SUPER_SEACRETE="your jwt super secret"
+PORT:"your backend portnumber"
 ```
 
 ### FrontEnd dependencies:
